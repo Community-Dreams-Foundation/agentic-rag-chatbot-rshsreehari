@@ -1,0 +1,17 @@
+Agentic RAG Chatbot Reference
+
+This project demonstrates a production-minded AI assistant with three features:
+1) File-grounded Q&A using retrieval augmented generation.
+2) Durable selective memory stored in markdown files.
+3) Safe weather analytics with Open-Meteo through a restricted execution path.
+
+Retrieval pipeline:
+- Ingestion parses uploaded documents.
+- Chunking creates overlapping section-aware pieces.
+- Hybrid scoring combines BM25 lexical relevance and semantic vector similarity.
+- Reranking prioritizes chunks with stronger query-term alignment.
+
+Answering policy:
+- The assistant must answer only from retrieved chunks.
+- Every answer must include citations that identify source and chunk locator.
+- If relevant evidence is missing, it should clearly say it cannot find the answer in uploaded docs.

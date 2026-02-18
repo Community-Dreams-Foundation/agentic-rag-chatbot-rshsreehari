@@ -19,5 +19,3 @@ fi
 python3 scripts/verify_output.py "$OUT"
 
 echo "OK: sanity check passed"
-
-After updating, run: chmod +x scripts/sanity_check.sh

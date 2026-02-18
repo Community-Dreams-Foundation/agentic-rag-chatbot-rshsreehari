@@ -1,6 +1,13 @@
-.PHONY: sanity
+.PHONY: setup run sanity clean
+
+setup:
+	python3 -m pip install -r requirements.txt
+
+run:
+	python3 -m streamlit run app/main.py
 
 sanity:
-	@echo "ERROR: You must implement 'make sanity' for your stack."
-	@echo "It must generate artifacts/sanity_output.json"
-	@exit 1
+	python3 -m app.sanity
+
+clean:
+	rm -rf chroma_db data/chromadb artifacts/sanity_output.json

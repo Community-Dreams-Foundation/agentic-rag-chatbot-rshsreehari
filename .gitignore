@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Secrets — NEVER commit these
+.env
+.env.local
+
+# Runtime data (recreated by the app)
+chroma_db/
+data/uploads/
+data/chromadb/
+artifacts/sanity_output.json
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Streamlit cache
+.streamlit/secrets.toml

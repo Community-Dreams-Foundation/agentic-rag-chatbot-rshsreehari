@@ -68,10 +68,34 @@ class MemoryManager:
         }
 
     def _dedupe(self, path: Path, summary: str) -> bool:
+        """Reject if an existing entry is substantially similar (fuzzy match)."""
         if not path.exists():
             return False
-        existing = path.read_text(encoding="utf-8", errors="ignore").lower()
-        return summary.lower() in existing
+        existing = path.read_text(encoding="utf-8", errors="ignore")
+        existing_lower = existing.lower()
+        summary_lower = summary.lower().strip()
+
+        # Exact substring match
+        if summary_lower in existing_lower:
+            return True
+
+        # Fuzzy token-overlap check: if >70% of tokens already exist in memory, skip
+        summary_tokens = set(re.findall(r"[a-z0-9]+", summary_lower))
+        if not summary_tokens:
+            return True
+        # Check against each existing memory entry
+        for line in existing.splitlines():
+            line = line.strip()
+            if not line.startswith("- ") or "|" not in line:
+                continue
+            entry_part = line.split("|", 1)[-1].strip().lower()
+            entry_tokens = set(re.findall(r"[a-z0-9]+", entry_part))
+            if not entry_tokens:
+                continue
+            overlap = len(summary_tokens & entry_tokens) / len(summary_tokens)
+            if overlap > 0.70:
+                return True
+        return False
 
     def _append(self, path: Path, summary: str) -> None:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -81,14 +105,20 @@ class MemoryManager:
     def decide_and_write(self, user_message: str, assistant_message: str, llm: GeminiClient) -> MemoryWrite | None:
         default = self._extract_rule_based(user_message)
 
-        prompt = f"""
-Given the conversation below, decide if a reusable memory should be written.
-Return strict JSON with keys: should_write (bool), target ("user"|"company"), summary (string), confidence (0..1).
-Rules: selective, reusable, high-signal only, no transcript dumping, never include secrets.
+        prompt = f"""Analyze this conversation and decide if a DURABLE memory should be stored.
+Return strict JSON: {{"should_write": bool, "target": "user"|"company", "summary": string, "confidence": 0..1}}
+
+STRICT RULES — follow exactly:
+- Write ONLY short, reusable, profile-level facts (e.g. "User prefers dark mode", "Company uses 2-week sprints").
+- NEVER summarize the assistant's answer or the document content.
+- NEVER store RAG retrieval results, document summaries, or Q&A transcripts.
+- Only write if the USER explicitly states a preference, role, or org fact.
+- If the conversation is just a question about a document and an answer, set should_write=false.
+- confidence must be >= 0.85 to write. If uncertain, set should_write=false.
+- summary must be ONE concise sentence, max 20 words.
 
 User: {user_message}
-Assistant: {assistant_message}
-""".strip()
+Assistant: {assistant_message}""".strip()
 
         decision = llm.json_decision(prompt, default_obj=default)
 
@@ -97,9 +127,12 @@ Assistant: {assistant_message}
         summary = str(decision.get("summary", "")).strip()
         confidence = float(decision.get("confidence", 0.0) or 0.0)
 
-        if not should_write or confidence < 0.8 or not summary:
+        if not should_write or confidence < 0.85 or not summary:
             return None
         if self._is_sensitive(summary):
+            return None
+        # Reject overly long summaries — likely document dumps, not durable facts
+        if len(summary.split()) > 30:
             return None
 
         if target not in {"user", "company"}:

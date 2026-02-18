@@ -10,10 +10,21 @@ from dotenv import load_dotenv
 
 # Suppress noisy deprecation warnings on older Python
 warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", message=".*Both GOOGLE_API_KEY and GEMINI_API_KEY.*")
 
 # Load local env files for all entrypoints (UI + sanity + scripts).
 load_dotenv(".env.local")
 load_dotenv(".env")
+
+# ── Resolve API key once at import time to prevent duplicate-key warnings ──
+_RESOLVED_API_KEY: Optional[str] = None
+_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+if _key:
+    _RESOLVED_API_KEY = _key
+    # SDK auto-reads GOOGLE_API_KEY and warns if both are set.
+    # Remove BOTH env vars so the SDK doesn't find them; we pass the key explicitly.
+    os.environ.pop("GOOGLE_API_KEY", None)
+    os.environ.pop("GEMINI_API_KEY", None)
 
 
 def _try_import_genai():
@@ -40,14 +51,9 @@ class GeminiClient:
         self._client = None
         self._available = False
 
-        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        if self._genai and api_key:
+        if self._genai and _RESOLVED_API_KEY:
             try:
-                # Explicitly pass the key to avoid SDK's auto-detection warning
-                self._client = self._genai.Client(api_key=api_key)
-                # Unset env var to suppress "Both keys set" warning from SDK
-                if os.getenv("GOOGLE_API_KEY") and os.getenv("GEMINI_API_KEY"):
-                    os.environ.pop("GOOGLE_API_KEY", None)
+                self._client = self._genai.Client(api_key=_RESOLVED_API_KEY)
                 self._available = True
             except Exception:
                 self._available = False

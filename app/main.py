@@ -13,7 +13,7 @@ from app.memory import MemoryManager
 from app.rag import answer_with_citations
 from app.retrieval import retrieve_hybrid
 from app.sandbox import analyze_weather
-from app.store import get_collection
+from app.store import get_collection, list_indexed_sources, delete_source
 
 load_dotenv()
 
@@ -123,10 +123,15 @@ with st.sidebar:
 
     # ── Load Sample Documents ────────────────────────────────────────────────
     if st.button("Load Sample Documents", use_container_width=True):
+        # Filter out system reference docs that would pollute retrieval
+        SYSTEM_DOCS = {"hackathon_overview.txt", "README.md"}
         sample_files = list(SAMPLE_DIR.glob("*.*"))
-        sample_files = [f for f in sample_files if f.suffix.lower() in {".txt", ".md", ".pdf"}]
+        sample_files = [
+            f for f in sample_files
+            if f.suffix.lower() in {".txt", ".md", ".pdf"} and f.name not in SYSTEM_DOCS
+        ]
         if not sample_files:
-            st.warning("No sample documents found in sample_docs/")
+            st.warning("No user-facing sample documents found in sample_docs/")
         else:
             with st.spinner("Indexing sample documents..."):
                 try:
@@ -142,6 +147,28 @@ with st.sidebar:
         f'<p class="chunk-counter">{st.session_state.indexed_chunks}</p>',
         unsafe_allow_html=True,
     )
+
+    # ── Indexed Files panel (file management) ────────────────────────────────
+    indexed_sources = list_indexed_sources()
+    if indexed_sources:
+        with st.expander(f"📂 Indexed Files ({len(indexed_sources)})", expanded=False):
+            for src_info in indexed_sources:
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"📄 **{src_info['source']}** — {src_info['chunks']} chunks")
+                with col2:
+                    if st.button("🗑️", key=f"del_{src_info['source']}", help=f"Remove {src_info['source']}"):
+                        removed = delete_source(src_info['source'])
+                        st.session_state.indexed_chunks = get_collection().count()
+                        st.success(f"Removed {removed} chunks from {src_info['source']}")
+                        st.rerun()
+            st.divider()
+            if st.button("🗑️ Clear All", use_container_width=True, type="secondary"):
+                from app.store import reset_collection
+                reset_collection()
+                st.session_state.indexed_chunks = 0
+                st.success("All documents cleared.")
+                st.rerun()
 
     st.divider()
 
@@ -231,29 +258,31 @@ if prompt := st.chat_input("Ask a question about your documents..."):
             st.markdown(answer_text)
             citations_json = []
         else:
-            # Build answer with streaming
-            result = answer_with_citations(prompt, chunks, llm)
+            # Build prompt + stream the answer from Gemini
+            from app.rag import _sanitize_query, _build_prompt, _citations_from_chunks
 
-            # Display the answer with streaming effect
-            st.markdown(result.answer)
-
-            # Build citations
+            safe_query = _sanitize_query(prompt)
+            rag_prompt = _build_prompt(safe_query, chunks)
+            citations = _citations_from_chunks(chunks)
             citations_json = [
-                {
-                    "source": c.source,
-                    "locator": c.locator,
-                    "snippet": c.snippet,
-                }
-                for c in result.citations
+                {"source": c.source, "locator": c.locator, "snippet": c.snippet}
+                for c in citations
             ]
+
+            # Stream with st.write_stream for real-time token display
+            answer_text = st.write_stream(llm.stream(rag_prompt, fallback="Based on the uploaded documents: please see the cited passages below."))
+
+            # Ensure citations are appended if the model didn't inline them
+            if "[" not in answer_text:
+                answer_text += "\n\nSources: " + ", ".join(
+                    f"[{i}]" for i in range(1, min(4, len(citations_json) + 1))
+                )
 
             # Show citations in expander
             with st.expander("View Citations"):
                 for i, c in enumerate(citations_json, 1):
                     st.markdown(f"**[{i}] From {c['source']}** ({c['locator']})")
                     st.caption(c["snippet"][:300])
-
-            answer_text = result.answer
 
         # Memory decision
         mem = memory.decide_and_write(prompt, answer_text, llm)

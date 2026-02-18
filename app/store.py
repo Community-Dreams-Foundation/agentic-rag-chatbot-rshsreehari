@@ -55,3 +55,38 @@ def reset_collection() -> None:
         client.delete_collection(COLLECTION_NAME)
     except Exception:
         pass
+
+
+def list_indexed_sources() -> list[dict]:
+    """Return a list of {source, chunk_count} for each unique file in the index."""
+    collection = get_collection()
+    total = collection.count()
+    if total == 0:
+        return []
+
+    payload = collection.get(include=["metadatas"])
+    metas = payload.get("metadatas") or []
+
+    counts: dict[str, int] = {}
+    for m in metas:
+        src = m.get("source", "unknown")
+        counts[src] = counts.get(src, 0) + 1
+
+    return [{"source": src, "chunks": cnt} for src, cnt in sorted(counts.items())]
+
+
+def delete_source(source_name: str) -> int:
+    """Delete all chunks belonging to a specific source file. Returns count deleted."""
+    collection = get_collection()
+    payload = collection.get(include=["metadatas"])
+    ids = payload.get("ids") or []
+    metas = payload.get("metadatas") or []
+
+    to_delete = [
+        doc_id for doc_id, m in zip(ids, metas)
+        if m.get("source") == source_name
+    ]
+
+    if to_delete:
+        collection.delete(ids=to_delete)
+    return len(to_delete)

@@ -201,6 +201,13 @@ with st.sidebar:
             st.markdown("**🏢 Company Memory**")
             for entry in company_entries[-5:]:
                 st.markdown(f'<div class="memory-entry">{entry}</div>', unsafe_allow_html=True)
+        if st.button("🗑️ Clear Memory", use_container_width=True, key="clear_mem"):
+            _hdr_u = "# USER MEMORY\n\n<!--\nAppend only high-signal, user-specific facts worth remembering.\nDo NOT dump raw conversation.\nAvoid secrets or sensitive information.\n-->\n"
+            _hdr_c = "# COMPANY MEMORY\n\n<!--\nAppend reusable org-wide learnings that could help colleagues too.\nDo NOT dump raw conversation.\nAvoid secrets or sensitive information.\n-->\n"
+            user_mem_path.write_text(_hdr_u, encoding="utf-8")
+            company_mem_path.write_text(_hdr_c, encoding="utf-8")
+            st.success("Memory cleared.")
+            st.rerun()
     else:
         st.caption("No memories stored yet. Chat to build memory.")
 

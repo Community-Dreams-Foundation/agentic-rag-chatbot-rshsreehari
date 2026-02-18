@@ -72,24 +72,30 @@ class MemoryManager:
         if not path.exists():
             return False
         existing = path.read_text(encoding="utf-8", errors="ignore")
-        existing_lower = existing.lower()
         summary_lower = summary.lower().strip()
 
-        # Exact substring match
-        if summary_lower in existing_lower:
-            return True
+        # Only compare against actual memory entries (lines starting with "- ")
+        entry_lines = [
+            line.strip()[2:] for line in existing.splitlines()
+            if line.strip().startswith("- ") and "|" in line
+        ]
 
-        # Fuzzy token-overlap check: if >70% of tokens already exist in memory, skip
+        # No entries yet → nothing to dedupe against
+        if not entry_lines:
+            return False
+
         summary_tokens = set(re.findall(r"[a-z0-9]+", summary_lower))
         if not summary_tokens:
             return True
-        # Check against each existing memory entry
-        for line in existing.splitlines():
-            line = line.strip()
-            if not line.startswith("- ") or "|" not in line:
-                continue
-            entry_part = line.split("|", 1)[-1].strip().lower()
-            entry_tokens = set(re.findall(r"[a-z0-9]+", entry_part))
+
+        for entry in entry_lines:
+            entry_lower = entry.lower()
+            # Exact substring match against entry content (after the timestamp)
+            entry_content = entry_lower.split("|", 1)[-1].strip() if "|" in entry_lower else entry_lower
+            if summary_lower in entry_content or entry_content in summary_lower:
+                return True
+            # Fuzzy token-overlap: if >70% of tokens overlap, skip
+            entry_tokens = set(re.findall(r"[a-z0-9]+", entry_content))
             if not entry_tokens:
                 continue
             overlap = len(summary_tokens & entry_tokens) / len(summary_tokens)
@@ -108,14 +114,15 @@ class MemoryManager:
         prompt = f"""Analyze this conversation and decide if a DURABLE memory should be stored.
 Return strict JSON: {{"should_write": bool, "target": "user"|"company", "summary": string, "confidence": 0..1}}
 
-STRICT RULES — follow exactly:
-- Write ONLY short, reusable, profile-level facts (e.g. "User prefers dark mode", "Company uses 2-week sprints").
-- NEVER summarize the assistant's answer or the document content.
-- NEVER store RAG retrieval results, document summaries, or Q&A transcripts.
-- Only write if the USER explicitly states a preference, role, or org fact.
-- If the conversation is just a question about a document and an answer, set should_write=false.
-- confidence must be >= 0.85 to write. If uncertain, set should_write=false.
+RULES:
+- Write short, reusable facts that would be useful in future conversations.
+- Good examples: user preferences, user role/background, key document facts (e.g. "Resume lists 2 projects"), org processes.
+- Do NOT dump the full assistant answer or long document excerpts.
+- Do NOT store trivial or one-off facts (e.g. "user asked about projects").
+- If a genuinely useful, reusable fact emerges, set should_write=true.
 - summary must be ONE concise sentence, max 20 words.
+- confidence must be >= 0.85 to write.
+- target should be "user" for personal facts or "company" for org-wide facts.
 
 User: {user_message}
 Assistant: {assistant_message}""".strip()

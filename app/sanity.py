@@ -8,6 +8,7 @@ from app.llm_client import GeminiClient
 from app.memory import MemoryManager
 from app.rag import answer_with_citations, citations_as_json
 from app.retrieval import retrieve_hybrid
+from app.store import set_active_collection
 
 ARTIFACT_PATH = Path("artifacts/sanity_output.json")
 SAMPLE_DOC = Path("sample_docs/hackathon_overview.txt")
@@ -35,6 +36,9 @@ def run() -> dict:
     ensure_sample_doc()
 
     ARTIFACT_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    # Sanity runs headlessly — use default (non-user) collection
+    set_active_collection(None)
 
     chunk_count = ingest_paths([SAMPLE_DOC], reset_index=True)
 

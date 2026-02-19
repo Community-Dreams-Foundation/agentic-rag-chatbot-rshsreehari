@@ -11,6 +11,8 @@ __pycache__/
 chroma_db/
 data/uploads/
 data/chromadb/
+data/users/
+data/users.db
 artifacts/sanity_output.json
 
 # OS junk

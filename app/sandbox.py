@@ -15,11 +15,25 @@ SAFE_BUILTINS = {
     "max": max,
     "abs": abs,
     "round": round,
+    "range": range,
+    "enumerate": enumerate,
+    "int": int,
+    "float": float,
+    "bool": bool,
+    "str": str,
+    "list": list,
+    "dict": dict,
+    "tuple": tuple,
+    "zip": zip,
+    "sorted": sorted,
+    "reversed": reversed,
+    "print": print,
 }
 
 ALLOWED_AST_NODES = {
     ast.Module,
     ast.Assign,
+    ast.AugAssign,
     ast.Expr,
     ast.Name,
     ast.Store,
@@ -29,12 +43,21 @@ ALLOWED_AST_NODES = {
     ast.Dict,
     ast.Tuple,
     ast.Subscript,
+    ast.Slice,
+    ast.Index,
     ast.BinOp,
     ast.UnaryOp,
+    ast.BoolOp,
+    ast.And,
+    ast.Or,
+    ast.Not,
+    ast.USub,
     ast.Add,
     ast.Sub,
     ast.Mult,
     ast.Div,
+    ast.FloorDiv,
+    ast.Mod,
     ast.Call,
     ast.Compare,
     ast.Gt,
@@ -43,6 +66,8 @@ ALLOWED_AST_NODES = {
     ast.LtE,
     ast.Eq,
     ast.NotEq,
+    ast.In,
+    ast.NotIn,
     ast.IfExp,
     ast.ListComp,
     ast.comprehension,
@@ -50,14 +75,26 @@ ALLOWED_AST_NODES = {
     ast.If,
     ast.Return,
     ast.FunctionDef,
+    ast.arguments,
+    ast.arg,
+    ast.Starred,
 }
+
+
+# Safe method names that can be called on objects inside the sandbox
+_SAFE_METHODS = {"append", "extend", "insert", "pop", "remove", "copy", "count", "index", "sort", "reverse", "items", "keys", "values", "get", "update"}
 
 
 def _validate_ast(code: str) -> None:
     tree = ast.parse(code)
     for node in ast.walk(tree):
-        if isinstance(node, (ast.Import, ast.ImportFrom, ast.Attribute, ast.Lambda, ast.ClassDef, ast.With, ast.Try)):
+        if isinstance(node, (ast.Import, ast.ImportFrom, ast.Lambda, ast.ClassDef, ast.With, ast.Try)):
             raise ValueError("Unsafe Python construct detected")
+        if isinstance(node, ast.Attribute):
+            # Allow only safe method names (e.g. list.append, dict.get)
+            if node.attr not in _SAFE_METHODS:
+                raise ValueError(f"Unsafe attribute access: .{node.attr}")
+            continue
         if type(node) not in ALLOWED_AST_NODES:
             raise ValueError(f"Unsupported AST node: {type(node).__name__}")
 

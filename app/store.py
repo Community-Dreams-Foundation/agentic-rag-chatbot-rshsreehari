@@ -12,6 +12,19 @@ DB_DIR = Path("chroma_db")
 COLLECTION_NAME = "rag_chunks_v1"
 EMBED_DIM = 256
 
+# ── Per-user collection override (set by main.py after login) ────────────────
+_active_collection_name: str | None = None
+
+
+def set_active_collection(name: str | None) -> None:
+    """Override the collection name for the current user session."""
+    global _active_collection_name
+    _active_collection_name = name
+
+
+def _current_collection_name() -> str:
+    return _active_collection_name or COLLECTION_NAME
+
 
 class LocalHashEmbeddingFunction:
     """Deterministic local embeddings to avoid remote model downloads."""
@@ -43,7 +56,7 @@ def get_collection() -> Collection:
     DB_DIR.mkdir(parents=True, exist_ok=True)
     client = chromadb.PersistentClient(path=str(DB_DIR))
     return client.get_or_create_collection(
-        name=COLLECTION_NAME,
+        name=_current_collection_name(),
         metadata={"hnsw:space": "cosine"},
         embedding_function=LocalHashEmbeddingFunction(),
     )
@@ -52,7 +65,7 @@ def get_collection() -> Collection:
 def reset_collection() -> None:
     client = chromadb.PersistentClient(path=str(DB_DIR))
     try:
-        client.delete_collection(COLLECTION_NAME)
+        client.delete_collection(_current_collection_name())
     except Exception:
         pass
 

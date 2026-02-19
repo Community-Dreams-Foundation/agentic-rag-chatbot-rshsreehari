@@ -239,16 +239,32 @@ These are optional enhancements. They are not required, but can earn bonus point
 
 ---
 
-## Quick Start (YOU MUST FILL THIS IN)
+## Quick Start
 
-Provide exact commands a judge can run.
+```bash
+# 1. Clone the repo and cd into it
+git clone <your-classroom-repo-url>
+cd agentic-rag-chatbot-rshsreehari
 
-Example (replace with your real commands):
+# 2. Create a .env.local file with your Gemini API key
+echo "GOOGLE_API_KEY=<your-gemini-api-key>" > .env.local
 
-```text
-# install dependencies
-# run the app
-# open UI or run CLI
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Run the app
+make run
+# (or: python3 -m streamlit run app/main.py)
+
+# 5. Open the URL shown in terminal (default: http://localhost:8501)
+```
+
+To run the sanity check:
+
+```bash
+make sanity
+# or
+bash scripts/sanity_check.sh
 ```
 
 ---

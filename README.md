@@ -157,11 +157,11 @@ bash scripts/sanity_check.sh
 
 ### 3) Video Walkthrough Link (Required)
 
-Add your video link here: https://drive.google.com/file/d/1FcTVqk-dZ-pug6-4kf1b4FgFXYNqwrHB/view?usp=sharing
+Add your video link here: https://drive.google.com/file/d/1v_4PaGymVod_m8toQ6T64_iZq51ok_7f/view?usp=sharing
 
 ## Video Walkthrough
 
-[PASTE YOUR LINK HERE](https://drive.google.com/file/d/1FcTVqk-dZ-pug6-4kf1b4FgFXYNqwrHB/view?usp=sharing)
+https://drive.google.com/file/d/1v_4PaGymVod_m8toQ6T64_iZq51ok_7f/view?usp=sharing
 
 ## 4) Important
 Submissions missing the Participant Info block may be deprioritized during review.
